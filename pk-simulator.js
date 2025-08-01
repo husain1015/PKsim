@@ -242,6 +242,7 @@ function runSimulation() {
     const nDoses = doseType === 'multiple' ? parseInt(document.getElementById('nDoses').value) : 1;
     const tau = doseType === 'multiple' ? parseFloat(document.getElementById('tau').value) : 0;
     const simTime = parseFloat(document.getElementById('simTime').value);
+    const yScale = document.getElementById('yScale').value;
     
     // Get model parameters
     let params = {};
@@ -286,14 +287,45 @@ function runSimulation() {
     }
     
     // Update chart
-    updateChart(result.times, result.concentrations, modelType, doseTimes, doseType);
+    updateChart(result.times, result.concentrations, modelType, doseTimes, doseType, yScale);
     
     // Update tables
     updateTables(paramSummary, metrics, doseType);
 }
 
+// Calculate nice axis breaks
+function calculateNiceBreaks(min, max, targetCount = 6) {
+    const range = max - min;
+    const roughStep = range / targetCount;
+    
+    // Calculate magnitude of the step
+    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const normalizedStep = roughStep / magnitude;
+    
+    let niceStep;
+    if (normalizedStep <= 1) niceStep = 1;
+    else if (normalizedStep <= 2) niceStep = 2;
+    else if (normalizedStep <= 5) niceStep = 5;
+    else niceStep = 10;
+    
+    niceStep *= magnitude;
+    
+    // Calculate nice min and max
+    const niceMin = Math.floor(min / niceStep) * niceStep;
+    const niceMax = Math.ceil(max / niceStep) * niceStep;
+    
+    const breaks = [];
+    for (let i = niceMin; i <= niceMax; i += niceStep) {
+        if (i >= min && i <= max) {
+            breaks.push(i);
+        }
+    }
+    
+    return { breaks, step: niceStep };
+}
+
 // Update chart
-function updateChart(times, concentrations, modelType, doseTimes, doseType) {
+function updateChart(times, concentrations, modelType, doseTimes, doseType, yScale = 'log') {
     const ctx = document.getElementById('pkChart').getContext('2d');
     
     if (pkChart) {
@@ -404,15 +436,23 @@ function updateChart(times, concentrations, modelType, doseTimes, doseType) {
                             size: 12
                         },
                         callback: function(value) {
-                            return value;
-                        }
+                            // Clean formatting for time axis
+                            if (value % 1 === 0) {
+                                return value;
+                            }
+                            return '';
+                        },
+                        stepSize: times[times.length - 1] > 100 ? 24 : 
+                                 times[times.length - 1] > 50 ? 12 : 
+                                 times[times.length - 1] > 20 ? 6 : 
+                                 times[times.length - 1] > 10 ? 2 : 1
                     }
                 },
-                y: {
+                y: yScale === 'log' ? {
                     type: 'logarithmic',
                     title: {
                         display: true,
-                        text: 'Plasma Concentration (mg/L)',
+                        text: 'Plasma Concentration (mg/L) - Log Scale',
                         font: {
                             size: 14,
                             weight: 'bold'
@@ -430,42 +470,118 @@ function updateChart(times, concentrations, modelType, doseTimes, doseType) {
                             size: 12
                         },
                         callback: function(value, index, values) {
-                            // Format the tick labels nicely
+                            // Only show major gridlines at powers of 10
                             const logValue = Math.log10(value);
-                            if (Math.abs(logValue - Math.round(logValue)) < 0.01) {
-                                // It's a power of 10
-                                if (value >= 1) {
-                                    return value.toFixed(0);
-                                } else {
-                                    return value.toFixed(-Math.floor(Math.log10(value)));
-                                }
+                            const isWhole = Math.abs(logValue - Math.round(logValue)) < 0.01;
+                            
+                            if (isWhole) {
+                                if (value >= 1000) return value.toExponential(0);
+                                if (value >= 1) return value.toFixed(0);
+                                if (value >= 0.001) return value.toFixed(-Math.floor(Math.log10(value)));
+                                return value.toExponential(0);
                             }
+                            
+                            // Show 2 and 5 multipliers for better granularity
+                            const normalized = value / Math.pow(10, Math.floor(logValue));
+                            if (Math.abs(normalized - 2) < 0.1 || Math.abs(normalized - 5) < 0.1) {
+                                if (value >= 1) return value.toFixed(0);
+                                return value.toFixed(-Math.floor(Math.log10(value)));
+                            }
+                            
                             return '';
                         },
                         autoSkip: false,
-                        maxTicksLimit: 10
+                        maxTicksLimit: 20
+                    }
+                } : {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Plasma Concentration (mg/L) - Linear Scale',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    min: 0,
+                    max: maxConc * 1.1,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)',
+                        drawBorder: true,
+                        borderColor: '#333'
+                    },
+                    ticks: {
+                        font: {
+                            size: 12
+                        },
+                        callback: function(value) {
+                            // Clean formatting for concentration
+                            if (value >= 100) {
+                                return value.toFixed(0);
+                            } else if (value >= 10) {
+                                return value.toFixed(1);
+                            } else if (value >= 1) {
+                                return value.toFixed(2);
+                            } else if (value > 0) {
+                                return value.toFixed(3);
+                            }
+                            return '0';
+                        },
+                        count: 8
                     }
                 }
             },
             plugins: {
                 annotation: {
-                    annotations: doseTimes.map((doseTime, index) => ({
+                    annotations: doseType === 'multiple' ? doseTimes.map((doseTime, index) => ({
                         type: 'line',
                         xMin: doseTime,
                         xMax: doseTime,
-                        borderColor: 'rgba(255, 99, 132, 0.8)',
+                        borderColor: 'rgba(255, 99, 132, 0.7)',
                         borderWidth: 2,
                         borderDash: [5, 5],
                         label: {
                             enabled: true,
                             content: `Dose ${index + 1}`,
                             position: 'start',
-                            backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                            yAdjust: -20 - (index % 2) * 20, // Stagger labels
+                            backgroundColor: 'rgba(255, 99, 132, 0.9)',
                             font: {
-                                size: 11
+                                size: 11,
+                                weight: 'bold'
+                            },
+                            padding: {
+                                top: 2,
+                                bottom: 2,
+                                left: 6,
+                                right: 6
                             }
                         }
-                    }))
+                    })) : [{
+                        type: 'line',
+                        xMin: 0,
+                        xMax: 0,
+                        borderColor: 'rgba(255, 99, 132, 0.7)',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        label: {
+                            enabled: true,
+                            content: 'Dose',
+                            position: 'start',
+                            yAdjust: -20,
+                            backgroundColor: 'rgba(255, 99, 132, 0.9)',
+                            font: {
+                                size: 11,
+                                weight: 'bold'
+                            },
+                            padding: {
+                                top: 2,
+                                bottom: 2,
+                                left: 6,
+                                right: 6
+                            }
+                        }
+                    }]
                 }
             }
         }
@@ -537,6 +653,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('doseType').addEventListener('change', updateUI);
     document.getElementById('simulateBtn').addEventListener('click', runSimulation);
     document.getElementById('exportBtn').addEventListener('click', exportChart);
+    document.getElementById('yScale').addEventListener('change', runSimulation);
     
     // Initialize UI
     updateUI();
