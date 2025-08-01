@@ -251,27 +251,27 @@
                 <div class="parameter-group">
                     <div class="form-group">
                         <label for="CL">Clearance (L/h):</label>
-                        <input type="number" id="CL" value="24" min="1" max="100" step="0.1">
+                        <input type="number" id="CL" value="400" min="100" max="1000" step="10">
                     </div>
                     <div class="form-group">
                         <label for="V1">Central Volume (L):</label>
-                        <input type="number" id="V1" value="50" min="10" max="200" step="1">
+                        <input type="number" id="V1" value="100" min="50" max="500" step="10">
                     </div>
                     <div class="form-group">
                         <label for="Q">Inter-compartmental Clearance (L/h):</label>
-                        <input type="number" id="Q" value="40" min="1" max="100" step="1">
+                        <input type="number" id="Q" value="100" min="10" max="500" step="10">
                     </div>
                     <div class="form-group">
                         <label for="V2">Peripheral Volume (L):</label>
-                        <input type="number" id="V2" value="50" min="10" max="200" step="1">
+                        <input type="number" id="V2" value="500" min="100" max="2000" step="50">
                     </div>
                     <div class="form-group">
                         <label for="Ka">Absorption Rate Constant (1/h):</label>
-                        <input type="number" id="Ka" value="1.5" min="0.1" max="5" step="0.1">
+                        <input type="number" id="Ka" value="3.0" min="0.5" max="10" step="0.1">
                     </div>
                     <div class="form-group">
                         <label for="F">Bioavailability:</label>
-                        <input type="number" id="F" value="0.9" min="0.1" max="1" step="0.05">
+                        <input type="number" id="F" value="0.4" min="0.1" max="1" step="0.05">
                     </div>
                 </div>
                 
@@ -320,6 +320,7 @@
             <div class="results">
                 <div class="info-box">
                     <p><strong>Model:</strong> Two-compartment with first-order absorption | <strong>Covariates:</strong> Body weight on CL and V (allometric scaling)</p>
+                    <p style="margin-top: 8px; font-size: 13px;"><strong>Expected values for 7.5 mg dose:</strong> Cmax ~20-30 ng/mL | Tmax ~1 h | t½ ~6 h | Based on published ivabradine PK studies</p>
                 </div>
                 
                 <div class="chart-container">
@@ -328,14 +329,14 @@
                 
                 <div class="metrics-container">
                     <div class="metrics-table">
-                        <h4>Population Summary</h4>
+                        <h4>Population PK Parameters</h4>
                         <table id="popTable">
                             <tbody></tbody>
                         </table>
                     </div>
                     
                     <div class="metrics-table">
-                        <h4>Exposure Metrics (Steady-State)</h4>
+                        <h4 id="metricsTitle">NCA Results (Population)</h4>
                         <table id="metricsTable">
                             <tbody></tbody>
                         </table>

@@ -95,18 +95,19 @@ function simulateIndividual(dose, dosing, nDoses, params, simTime) {
     
     if (dosing === 'single') {
         // Single dose
-        y0[0] = dose * params.F; // Dose with bioavailability
+        y0[0] = dose * params.F; // Dose in mg with bioavailability
         const model = twoCompartmentOralModel(params);
         const result = rungeKutta4(model, y0, 0, simTime, dt);
         times = result.t;
-        concentrations = result.y.map(y => y[1] / params.V1); // Central concentration
+        // Central concentration in mg/L
+        concentrations = result.y.map(y => y[1] / params.V1);
     } else {
         // Multiple doses
         let currentTime = 0;
         let currentY = [...y0];
         
         for (let i = 0; i < nDoses; i++) {
-            // Add dose to depot
+            // Add dose to depot in mg
             currentY[0] += dose * params.F;
             
             // Simulate until next dose or end
@@ -117,6 +118,7 @@ function simulateIndividual(dose, dosing, nDoses, params, simTime) {
             // Store results
             const startIdx = (i === 0) ? 0 : 1;
             times.push(...result.t.slice(startIdx));
+            // Central concentration in mg/L
             concentrations.push(...result.y.slice(startIdx).map(y => y[1] / params.V1));
             
             // Update for next iteration
@@ -132,12 +134,19 @@ function simulateIndividual(dose, dosing, nDoses, params, simTime) {
 
 // Simulate population
 function simulatePopulation() {
-    // Get input values
-    const nSubjects = parseInt(document.getElementById('nSubjects').value);
-    const dose = parseFloat(document.getElementById('dose').value);
-    const dosing = document.getElementById('dosing').value;
-    const nDoses = parseInt(document.getElementById('nDoses').value);
-    const simTime = parseFloat(document.getElementById('simTime').value);
+    // Show loading state
+    const btn = document.getElementById('simulateBtn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Simulating...';
+    btn.disabled = true;
+    
+    setTimeout(() => {
+        // Get input values
+        const nSubjects = parseInt(document.getElementById('nSubjects').value);
+        const dose = parseFloat(document.getElementById('dose').value);
+        const dosing = document.getElementById('dosing').value;
+        const nDoses = parseInt(document.getElementById('nDoses').value);
+        const simTime = parseFloat(document.getElementById('simTime').value);
     
     // Population parameters
     const popParams = {
@@ -191,10 +200,15 @@ function simulatePopulation() {
         popParams: popParams
     };
     
-    // Update visualization
-    const yScale = document.getElementById('yScale').value;
-    updateChart(summaryStats, allProfiles, dosing, yScale);
-    updateTables(individualParams, exposureMetrics, dosing, dose);
+        // Update visualization
+        const yScale = document.getElementById('yScale').value;
+        updateChart(summaryStats, allProfiles, dosing, yScale);
+        updateTables(individualParams, exposureMetrics, dosing, dose);
+        
+        // Reset button
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }, 100); // Small delay to show loading state
 }
 
 // Calculate summary statistics
@@ -600,6 +614,14 @@ function updateTables(individualParams, exposureMetrics, dosing, dose) {
     row.insertCell(0).textContent = 'Female (%)';
     row.insertCell(1).textContent = femalePercent;
     
+    // Update metrics title based on dosing
+    const metricsTitle = document.getElementById('metricsTitle');
+    if (dosing === 'single') {
+        metricsTitle.textContent = 'NCA Results - Single Dose (Population)';
+    } else {
+        metricsTitle.textContent = 'NCA Results - Steady State (Population)';
+    }
+    
     // Exposure metrics table
     const metricsTable = document.getElementById('metricsTable').getElementsByTagName('tbody')[0];
     metricsTable.innerHTML = '';
@@ -636,11 +658,20 @@ function updateTables(individualParams, exposureMetrics, dosing, dose) {
             const fluctuation = cmaxValues.map((cmax, i) => ((cmax - cminValues[i]) / cavgValues[i] * 100));
             addMetricRow(metricsTable, 'Fluctuation (%)', fluctuation);
         }
+    } else {
+        const row = metricsTable.insertRow();
+        const cell = row.insertCell(0);
+        cell.colSpan = 2;
+        cell.textContent = 'No metrics calculated';
+        cell.style.textAlign = 'center';
+        cell.style.fontStyle = 'italic';
     }
 }
 
 // Add metric row to table
 function addMetricRow(table, label, values) {
+    if (!values || values.length === 0) return;
+    
     const row = table.insertRow();
     row.insertCell(0).textContent = label;
     
@@ -650,7 +681,24 @@ function addMetricRow(table, label, values) {
     const p5 = sorted[Math.floor(sorted.length * 0.05)];
     const p95 = sorted[Math.floor(sorted.length * 0.95)];
     
-    row.insertCell(1).textContent = `${median.toFixed(2)} (${p5.toFixed(2)}-${p95.toFixed(2)})`;
+    // Format based on the metric type
+    let formatted;
+    if (label.includes('(%)') || label.includes('Tmax')) {
+        // For percentages and time values, use fewer decimals
+        formatted = `${median.toFixed(1)} (${p5.toFixed(1)}-${p95.toFixed(1)})`;
+    } else if (label.includes('ng/mL')) {
+        // For concentrations in ng/mL
+        if (median < 10) {
+            formatted = `${median.toFixed(2)} (${p5.toFixed(2)}-${p95.toFixed(2)})`;
+        } else {
+            formatted = `${median.toFixed(1)} (${p5.toFixed(1)}-${p95.toFixed(1)})`;
+        }
+    } else {
+        // Default formatting
+        formatted = `${median.toFixed(2)} (${p5.toFixed(2)}-${p95.toFixed(2)})`;
+    }
+    
+    row.insertCell(1).textContent = formatted;
 }
 
 // Export chart
