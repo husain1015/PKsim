@@ -1,6 +1,8 @@
 # PK Model Simulator
 
-An interactive R Shiny application for simulating pharmacokinetic (PK) profiles using mrgsolve.
+An interactive application for simulating pharmacokinetic (PK) profiles. Available in two versions:
+1. **Web Version**: Pure JavaScript implementation that runs in any modern browser
+2. **R Shiny Version**: Advanced implementation using mrgsolve for ODE solving
 
 ## Features
 
@@ -12,9 +14,11 @@ An interactive R Shiny application for simulating pharmacokinetic (PK) profiles 
 
 ## Online Access
 
-The app can be accessed at: [GitHub Pages](https://husain1015.github.io/PKsim/)
+### Web Version (No Installation Required)
+Access the JavaScript version directly at: [https://husain1015.github.io/PKsim/pk-simulator.html](https://husain1015.github.io/PKsim/pk-simulator.html)
 
-The live Shiny app is hosted at: [shinyapps.io](https://husain1015.shinyapps.io/PKsim/)
+### R Shiny Version
+Requires local installation (see instructions below)
 
 ## Local Installation
 
