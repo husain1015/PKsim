@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ivabradine Population PK Simulator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 30px;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            max-height: calc(100vh - 150px);
+            overflow-y: auto;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #0066cc;
+        }
+        
+        h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 18px;
+        }
+        
+        .parameter-group {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        #simulateBtn {
+            width: 100%;
+            padding: 12px;
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        #simulateBtn:hover {
+            background-color: #0052a3;
+        }
+        
+        .results {
+            padding: 20px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .metrics-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .metrics-table {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .metrics-table h4 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .metrics-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .metrics-table td {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .metrics-table td:first-child {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .info-box p {
+            color: #1976d2;
+            font-size: 14px;
+        }
+        
+        .variability-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .small-input {
+            width: 80px !important;
+        }
+        
+        .covariates-section {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 20px;
+            font-size: 14px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ivabradine Population PK Simulator</h1>
+        <p class="subtitle">Two-compartment model with first-order absorption and active metabolite</p>
+        
+        <div class="main-content">
+            <div class="sidebar">
+                <h3>Study Design</h3>
+                <div class="form-group">
+                    <label for="nSubjects">Number of Subjects:</label>
+                    <input type="number" id="nSubjects" value="100" min="1" max="1000" step="1">
+                </div>
+                
+                <h3>Dosing Regimen</h3>
+                <div class="form-group">
+                    <label for="dose">Dose (mg):</label>
+                    <select id="dose">
+                        <option value="2.5">2.5 mg</option>
+                        <option value="5" selected>5 mg</option>
+                        <option value="7.5">7.5 mg</option>
+                        <option value="10">10 mg</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="dosing">Dosing Schedule:</label>
+                    <select id="dosing">
+                        <option value="single">Single Dose</option>
+                        <option value="bid" selected>Twice Daily (BID)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="nDoses">Number of Doses (if BID):</label>
+                    <input type="number" id="nDoses" value="10" min="1" max="50" step="1">
+                </div>
+                
+                <h3>Population Characteristics</h3>
+                <div class="covariates-section">
+                    <div class="form-group">
+                        <label for="weightMean">Body Weight (kg):</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="number" id="weightMean" value="70" min="40" max="150" step="1" class="small-input" placeholder="Mean">
+                            <input type="number" id="weightSD" value="15" min="0" max="50" step="1" class="small-input" placeholder="SD">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="femalePercent">Female (%):</label>
+                        <input type="number" id="femalePercent" value="50" min="0" max="100" step="1">
+                    </div>
+                </div>
+                
+                <h3>PK Parameters (Population Mean)</h3>
+                <div class="parameter-group">
+                    <div class="form-group">
+                        <label for="CL">Clearance (L/h):</label>
+                        <input type="number" id="CL" value="24" min="1" max="100" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="V1">Central Volume (L):</label>
+                        <input type="number" id="V1" value="50" min="10" max="200" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="Q">Inter-compartmental Clearance (L/h):</label>
+                        <input type="number" id="Q" value="40" min="1" max="100" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="V2">Peripheral Volume (L):</label>
+                        <input type="number" id="V2" value="50" min="10" max="200" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="Ka">Absorption Rate Constant (1/h):</label>
+                        <input type="number" id="Ka" value="1.5" min="0.1" max="5" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="F">Bioavailability:</label>
+                        <input type="number" id="F" value="0.9" min="0.1" max="1" step="0.05">
+                    </div>
+                </div>
+                
+                <h3>Inter-Individual Variability (CV%)</h3>
+                <div class="parameter-group">
+                    <div class="variability-inputs">
+                        <div class="form-group">
+                            <label for="CL_CV">CL:</label>
+                            <input type="number" id="CL_CV" value="30" min="0" max="100" step="1" class="small-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="V1_CV">V1:</label>
+                            <input type="number" id="V1_CV" value="25" min="0" max="100" step="1" class="small-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="Ka_CV">Ka:</label>
+                            <input type="number" id="Ka_CV" value="40" min="0" max="100" step="1" class="small-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="F_CV">F:</label>
+                            <input type="number" id="F_CV" value="20" min="0" max="100" step="1" class="small-input">
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>Simulation Settings</h3>
+                <div class="form-group">
+                    <label for="simTime">Simulation Time (hours):</label>
+                    <input type="number" id="simTime" value="120" min="1" step="any">
+                </div>
+                <div class="form-group">
+                    <label for="yScale">Y-Axis Scale:</label>
+                    <select id="yScale">
+                        <option value="log" selected>Logarithmic</option>
+                        <option value="linear">Linear</option>
+                    </select>
+                </div>
+                
+                <button id="simulateBtn">Simulate Population</button>
+                
+                <div style="margin-top: 10px;">
+                    <button id="exportBtn" style="width: 100%; padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Export Chart as Image</button>
+                </div>
+            </div>
+            
+            <div class="results">
+                <div class="info-box">
+                    <p><strong>Model:</strong> Two-compartment with first-order absorption | <strong>Covariates:</strong> Body weight on CL and V (allometric scaling)</p>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="pkChart"></canvas>
+                </div>
+                
+                <div class="metrics-container">
+                    <div class="metrics-table">
+                        <h4>Population Summary</h4>
+                        <table id="popTable">
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="metrics-table">
+                        <h4>Exposure Metrics (Steady-State)</h4>
+                        <table id="metricsTable">
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="ivabradine-pk-simulator.js"></script>
+</body>
+</html>

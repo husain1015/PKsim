@@ -15,7 +15,8 @@ An interactive application for simulating pharmacokinetic (PK) profiles. Availab
 ## Online Access
 
 ### Web Version (No Installation Required)
-Access the JavaScript version directly at: [https://husain1015.github.io/PKsim/pk-simulator.html](https://husain1015.github.io/PKsim/pk-simulator.html)
+- **Generic PK Simulator**: [https://husain1015.github.io/PKsim/pk-simulator.html](https://husain1015.github.io/PKsim/pk-simulator.html)
+- **Ivabradine Population PK**: [https://husain1015.github.io/PKsim/ivabradine-pk-simulator.html](https://husain1015.github.io/PKsim/ivabradine-pk-simulator.html)
 
 ### R Shiny Version
 Requires local installation (see instructions below)
