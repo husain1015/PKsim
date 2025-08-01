@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PK Model Simulator</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -107,6 +108,10 @@
             position: relative;
             height: 500px;
             margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         
         .metrics-container {
@@ -265,6 +270,10 @@
                 </div>
                 
                 <button id="simulateBtn">Simulate</button>
+                
+                <div style="margin-top: 10px;">
+                    <button id="exportBtn" style="width: 100%; padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Export Chart as Image</button>
+                </div>
             </div>
             
             <div class="results">

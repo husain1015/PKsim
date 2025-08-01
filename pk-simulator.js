@@ -279,15 +279,21 @@ function runSimulation() {
     const metrics = calculateMetrics(result.times, result.concentrations, doseType, nDoses, tau);
     const paramSummary = calculateParamSummary(modelType, params);
     
+    // Calculate dose times for visualization
+    const doseTimes = [];
+    for (let i = 0; i < nDoses; i++) {
+        doseTimes.push(i * tau);
+    }
+    
     // Update chart
-    updateChart(result.times, result.concentrations, modelType);
+    updateChart(result.times, result.concentrations, modelType, doseTimes, doseType);
     
     // Update tables
     updateTables(paramSummary, metrics, doseType);
 }
 
 // Update chart
-function updateChart(times, concentrations, modelType) {
+function updateChart(times, concentrations, modelType, doseTimes, doseType) {
     const ctx = document.getElementById('pkChart').getContext('2d');
     
     if (pkChart) {
@@ -300,43 +306,105 @@ function updateChart(times, concentrations, modelType) {
         'three_comp': 'Three Compartment'
     }[modelType];
     
+    // Find min and max for better scaling
+    const minConc = Math.min(...concentrations.filter(c => c > 0));
+    const maxConc = Math.max(...concentrations);
+    
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(0, 102, 204, 0.3)');
+    gradient.addColorStop(1, 'rgba(0, 102, 204, 0.01)');
+    
     pkChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: times,
             datasets: [{
-                label: 'Concentration',
+                label: 'Plasma Concentration',
                 data: concentrations,
                 borderColor: '#0066cc',
-                backgroundColor: 'rgba(0, 102, 204, 0.1)',
-                borderWidth: 2,
+                backgroundColor: gradient,
+                borderWidth: 3,
                 pointRadius: 0,
-                tension: 0.1
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: '#0066cc',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2,
+                tension: 0.2,
+                fill: true
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            },
             plugins: {
                 title: {
                     display: true,
                     text: `PK Profile - ${modelName} Model`,
                     font: {
-                        size: 16,
+                        size: 18,
                         weight: 'bold'
-                    }
+                    },
+                    padding: 20
                 },
                 legend: {
-                    display: false
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 14
+                        },
+                        usePointStyle: true,
+                        pointStyle: 'line'
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleFont: {
+                        size: 14
+                    },
+                    bodyFont: {
+                        size: 13
+                    },
+                    padding: 10,
+                    displayColors: false,
+                    callbacks: {
+                        title: function(context) {
+                            return `Time: ${context[0].parsed.x.toFixed(1)} hours`;
+                        },
+                        label: function(context) {
+                            return `Concentration: ${context.parsed.y.toFixed(3)} mg/L`;
+                        }
+                    }
                 }
             },
             scales: {
                 x: {
+                    type: 'linear',
                     title: {
                         display: true,
                         text: 'Time (hours)',
                         font: {
-                            size: 14
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)',
+                        drawBorder: true,
+                        borderColor: '#333'
+                    },
+                    ticks: {
+                        font: {
+                            size: 12
+                        },
+                        callback: function(value) {
+                            return value;
                         }
                     }
                 },
@@ -344,23 +412,60 @@ function updateChart(times, concentrations, modelType) {
                     type: 'logarithmic',
                     title: {
                         display: true,
-                        text: 'Concentration (mg/L)',
+                        text: 'Plasma Concentration (mg/L)',
                         font: {
-                            size: 14
+                            size: 14,
+                            weight: 'bold'
                         }
                     },
+                    min: minConc * 0.5,
+                    max: maxConc * 2,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)',
+                        drawBorder: true,
+                        borderColor: '#333'
+                    },
                     ticks: {
-                        callback: function(value) {
-                            if (value === 1000) return '1000';
-                            if (value === 100) return '100';
-                            if (value === 10) return '10';
-                            if (value === 1) return '1';
-                            if (value === 0.1) return '0.1';
-                            if (value === 0.01) return '0.01';
-                            if (value === 0.001) return '0.001';
+                        font: {
+                            size: 12
+                        },
+                        callback: function(value, index, values) {
+                            // Format the tick labels nicely
+                            const logValue = Math.log10(value);
+                            if (Math.abs(logValue - Math.round(logValue)) < 0.01) {
+                                // It's a power of 10
+                                if (value >= 1) {
+                                    return value.toFixed(0);
+                                } else {
+                                    return value.toFixed(-Math.floor(Math.log10(value)));
+                                }
+                            }
                             return '';
-                        }
+                        },
+                        autoSkip: false,
+                        maxTicksLimit: 10
                     }
+                }
+            },
+            plugins: {
+                annotation: {
+                    annotations: doseTimes.map((doseTime, index) => ({
+                        type: 'line',
+                        xMin: doseTime,
+                        xMax: doseTime,
+                        borderColor: 'rgba(255, 99, 132, 0.8)',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        label: {
+                            enabled: true,
+                            content: `Dose ${index + 1}`,
+                            position: 'start',
+                            backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                            font: {
+                                size: 11
+                            }
+                        }
+                    }))
                 }
             }
         }
@@ -415,12 +520,23 @@ function updateTables(paramSummary, metrics, doseType) {
     }
 }
 
+// Export chart as image
+function exportChart() {
+    if (pkChart) {
+        const link = document.createElement('a');
+        link.download = 'pk-profile.png';
+        link.href = pkChart.toBase64Image();
+        link.click();
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     // Set up event listeners
     document.getElementById('modelType').addEventListener('change', updateUI);
     document.getElementById('doseType').addEventListener('change', updateUI);
     document.getElementById('simulateBtn').addEventListener('click', runSimulation);
+    document.getElementById('exportBtn').addEventListener('click', exportChart);
     
     // Initialize UI
     updateUI();
