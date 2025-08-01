@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PK Model Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .app-link {
+            display: inline-block;
+            margin: 20px 0;
+            padding: 15px 30px;
+            background-color: #0066CC;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 18px;
+        }
+        .app-link:hover {
+            background-color: #0052A3;
+        }
+        .instructions {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #0066CC;
+        }
+        code {
+            background-color: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PK Model Simulator</h1>
+        
+        <p>Welcome to the PK Model Simulator - an interactive R Shiny application for simulating pharmacokinetic profiles.</p>
+        
+        <h2>Features</h2>
+        <ul>
+            <li>Support for 1, 2, and 3 compartment PK models</li>
+            <li>Single and multiple dose simulations</li>
+            <li>Interactive parameter adjustment</li>
+            <li>Real-time concentration-time profile visualization</li>
+            <li>PK parameter and exposure metrics calculation</li>
+        </ul>
+        
+        <a href="https://husain1015.shinyapps.io/PKsim/" class="app-link">Launch App</a>
+        
+        <div class="instructions">
+            <h3>Local Installation</h3>
+            <p>To run this app locally, follow these steps:</p>
+            <ol>
+                <li>Clone this repository: <code>git clone https://github.com/husain1015/PKsim.git</code></li>
+                <li>Install required packages: <code>source("install_packages.R")</code></li>
+                <li>Run the app: <code>shiny::runApp("app.R")</code></li>
+            </ol>
+        </div>
+        
+        <h3>Required R Packages</h3>
+        <ul>
+            <li>shiny</li>
+            <li>mrgsolve</li>
+            <li>ggplot2</li>
+            <li>dplyr</li>
+            <li>tidyr</li>
+            <li>pracma</li>
+        </ul>
+    </div>
+</body>
+</html>
