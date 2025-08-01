@@ -181,7 +181,7 @@ function simulatePopulation() {
     const summaryStats = calculateSummaryStats(allProfiles, timePoints);
     
     // Calculate exposure metrics
-    const exposureMetrics = calculatePopulationMetrics(allProfiles, dosing, dose, nDoses);
+    const exposureMetrics = calculatePopulationMetrics(allProfiles, dosing, dose, nDoses, individualParams);
     
     // Store data for export
     simulationData = {
@@ -194,7 +194,7 @@ function simulatePopulation() {
     // Update visualization
     const yScale = document.getElementById('yScale').value;
     updateChart(summaryStats, allProfiles, dosing, yScale);
-    updateTables(individualParams, exposureMetrics);
+    updateTables(individualParams, exposureMetrics, dosing, dose);
 }
 
 // Calculate summary statistics
@@ -224,15 +224,22 @@ function calculateSummaryStats(allProfiles, timePoints) {
 }
 
 // Calculate population exposure metrics
-function calculatePopulationMetrics(allProfiles, dosing, dose, nDoses) {
+function calculatePopulationMetrics(allProfiles, dosing, dose, nDoses, individualParams) {
     const metrics = [];
     
-    for (let profile of allProfiles) {
+    for (let i = 0; i < allProfiles.length; i++) {
+        const profile = allProfiles[i];
+        const params = individualParams[i];
+        
         if (dosing === 'single') {
             const cmax = Math.max(...profile.concentrations);
             const tmax = profile.times[profile.concentrations.indexOf(cmax)];
             const auc = calculateAUC(profile.times, profile.concentrations);
-            metrics.push({ cmax, tmax, auc });
+            
+            // Calculate terminal half-life from last phase
+            const halfLife = calculateHalfLife(profile.times, profile.concentrations, params);
+            
+            metrics.push({ cmax, tmax, auc, halfLife, cl_f: params.CL/params.F });
         } else {
             // Get last dosing interval (steady-state)
             const tau = 12;
@@ -241,19 +248,48 @@ function calculatePopulationMetrics(allProfiles, dosing, dose, nDoses) {
             const ssEnd = profile.times.findIndex(t => t >= lastDoseTime + tau);
             
             if (ssStart >= 0 && ssEnd >= 0) {
-                const ssTimes = profile.times.slice(ssStart, ssEnd);
-                const ssConcs = profile.concentrations.slice(ssStart, ssEnd);
+                const ssTimes = profile.times.slice(ssStart, ssEnd + 1);
+                const ssConcs = profile.concentrations.slice(ssStart, ssEnd + 1);
                 
                 const cmax_ss = Math.max(...ssConcs);
                 const cmin_ss = Math.min(...ssConcs);
-                const auc_ss = calculateAUC(ssTimes.map(t => t - lastDoseTime), ssConcs);
+                const tmax_ss = ssTimes[ssConcs.indexOf(cmax_ss)] - lastDoseTime;
                 
-                metrics.push({ cmax_ss, cmin_ss, auc_ss });
+                // Calculate AUC for the dosing interval
+                const timeAdjusted = ssTimes.map(t => t - lastDoseTime);
+                const auc_ss = calculateAUC(timeAdjusted, ssConcs);
+                
+                // Average concentration
+                const cavg_ss = auc_ss / tau;
+                
+                metrics.push({ cmax_ss, cmin_ss, tmax_ss, auc_ss, cavg_ss, cl_f: params.CL/params.F });
             }
         }
     }
     
     return metrics;
+}
+
+// Calculate terminal half-life
+function calculateHalfLife(times, concentrations, params) {
+    // Use the elimination rate constant from the model
+    // For 2-compartment model, terminal half-life is based on beta phase
+    const beta = calculateBeta(params);
+    return 0.693 / beta;
+}
+
+// Calculate beta (terminal elimination rate constant) for 2-compartment model
+function calculateBeta(params) {
+    const { CL, V1, V2, Q } = params;
+    const k10 = CL / V1;
+    const k12 = Q / V1;
+    const k21 = Q / V2;
+    
+    const a = k10 + k12 + k21;
+    const b = k10 * k21;
+    
+    const beta = 0.5 * (a - Math.sqrt(a * a - 4 * b));
+    return beta;
 }
 
 // Calculate AUC using trapezoidal rule
@@ -273,11 +309,11 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
         pkChart.destroy();
     }
     
-    // Prepare datasets
+    // Prepare datasets - Convert to ng/mL for display
     const datasets = [
         {
             label: 'Median',
-            data: summaryStats.median,
+            data: summaryStats.median.map(v => v * 1000),
             borderColor: '#0066cc',
             backgroundColor: 'transparent',
             borderWidth: 3,
@@ -286,7 +322,7 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
         },
         {
             label: '90% Prediction Interval',
-            data: summaryStats.p95,
+            data: summaryStats.p95.map(v => v * 1000),
             borderColor: 'rgba(0, 102, 204, 0.3)',
             backgroundColor: 'transparent',
             borderWidth: 2,
@@ -297,7 +333,7 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
         },
         {
             label: '',
-            data: summaryStats.p5,
+            data: summaryStats.p5.map(v => v * 1000),
             borderColor: 'rgba(0, 102, 204, 0.3)',
             backgroundColor: 'rgba(0, 102, 204, 0.1)',
             borderWidth: 2,
@@ -313,7 +349,7 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
     for (let i = 0; i < nShow; i++) {
         datasets.push({
             label: '',
-            data: individualProfiles[i].concentrations,
+            data: individualProfiles[i].concentrations.map(v => v * 1000),
             borderColor: 'rgba(150, 150, 150, 0.2)',
             backgroundColor: 'transparent',
             borderWidth: 1,
@@ -395,11 +431,11 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
                         },
                         label: function(context) {
                             if (context.datasetIndex === 0) {
-                                return `Median: ${context.parsed.y.toFixed(3)} mg/L`;
+                                return `Median: ${context.parsed.y.toFixed(1)} ng/mL`;
                             } else if (context.datasetIndex === 1) {
-                                return `P95: ${context.parsed.y.toFixed(3)} mg/L`;
+                                return `P95: ${context.parsed.y.toFixed(1)} ng/mL`;
                             } else if (context.datasetIndex === 2) {
-                                return `P5: ${context.parsed.y.toFixed(3)} mg/L`;
+                                return `P5: ${context.parsed.y.toFixed(1)} ng/mL`;
                             }
                         }
                     }
@@ -458,14 +494,14 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
                     type: 'logarithmic',
                     title: {
                         display: true,
-                        text: 'Plasma Concentration (mg/L) - Log Scale',
+                        text: 'Plasma Concentration (ng/mL) - Log Scale',
                         font: {
                             size: 14,
                             weight: 'bold'
                         }
                     },
-                    min: minConc * 0.5,
-                    max: maxConc * 2,
+                    min: minConc * 500,
+                    max: maxConc * 2000,
                     grid: {
                         color: 'rgba(0, 0, 0, 0.05)',
                         drawBorder: true,
@@ -476,13 +512,15 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
                             size: 12
                         },
                         callback: function(value) {
-                            const logValue = Math.log10(value);
+                            // Convert to ng/mL for display
+                            const ngml = value * 1000;
+                            const logValue = Math.log10(ngml);
                             const isWhole = Math.abs(logValue - Math.round(logValue)) < 0.01;
                             
-                            if (isWhole) {
-                                if (value >= 1) return value.toFixed(0);
-                                if (value >= 0.001) return value.toFixed(-Math.floor(Math.log10(value)));
-                                return value.toExponential(0);
+                            if (isWhole || Math.abs(logValue - Math.round(logValue)) < 0.3) {
+                                if (ngml >= 1) return ngml.toFixed(0);
+                                if (ngml >= 0.1) return ngml.toFixed(1);
+                                return ngml.toFixed(2);
                             }
                             return '';
                         }
@@ -491,14 +529,14 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
                     type: 'linear',
                     title: {
                         display: true,
-                        text: 'Plasma Concentration (mg/L) - Linear Scale',
+                        text: 'Plasma Concentration (ng/mL) - Linear Scale',
                         font: {
                             size: 14,
                             weight: 'bold'
                         }
                     },
                     min: 0,
-                    max: maxConc * 1.1,
+                    max: maxConc * 1100,
                     grid: {
                         color: 'rgba(0, 0, 0, 0.05)',
                         drawBorder: true,
@@ -507,6 +545,9 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
                     ticks: {
                         font: {
                             size: 12
+                        },
+                        callback: function(value) {
+                            return value.toFixed(0);
                         }
                     }
                 }
@@ -516,7 +557,7 @@ function updateChart(summaryStats, individualProfiles, dosing, yScale = 'log') {
 }
 
 // Update tables
-function updateTables(individualParams, exposureMetrics) {
+function updateTables(individualParams, exposureMetrics, dosing, dose) {
     // Population summary table
     const popTable = document.getElementById('popTable').getElementsByTagName('tbody')[0];
     popTable.innerHTML = '';
@@ -525,7 +566,9 @@ function updateTables(individualParams, exposureMetrics) {
     const paramStats = {
         'CL (L/h)': individualParams.map(p => p.CL),
         'V1 (L)': individualParams.map(p => p.V1),
+        'V2 (L)': individualParams.map(p => p.V2),
         'Ka (1/h)': individualParams.map(p => p.Ka),
+        'F': individualParams.map(p => p.F),
         'Weight (kg)': individualParams.map(p => p.weight)
     };
     
@@ -535,7 +578,19 @@ function updateTables(individualParams, exposureMetrics) {
         const mean = values.reduce((a, b) => a + b) / values.length;
         const sorted = [...values].sort((a, b) => a - b);
         const median = sorted[Math.floor(sorted.length * 0.5)];
-        row.insertCell(1).textContent = `${mean.toFixed(1)} (${median.toFixed(1)})`;
+        const cv = (Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length) / mean * 100).toFixed(1);
+        row.insertCell(1).textContent = `${mean.toFixed(1)} ± ${(mean * parseFloat(cv) / 100).toFixed(1)} (CV: ${cv}%)`;
+    }
+    
+    // Add terminal half-life
+    if (exposureMetrics.length > 0 && exposureMetrics[0].halfLife) {
+        const halfLifeValues = exposureMetrics.map(m => m.halfLife);
+        const row = popTable.insertRow();
+        row.insertCell(0).textContent = 't½ (h)';
+        const mean = halfLifeValues.reduce((a, b) => a + b) / halfLifeValues.length;
+        const sorted = [...halfLifeValues].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length * 0.5)];
+        row.insertCell(1).textContent = `${mean.toFixed(1)} (${sorted[Math.floor(sorted.length * 0.05)].toFixed(1)}-${sorted[Math.floor(sorted.length * 0.95)].toFixed(1)})`;
     }
     
     // Add sex distribution
@@ -550,22 +605,36 @@ function updateTables(individualParams, exposureMetrics) {
     metricsTable.innerHTML = '';
     
     if (exposureMetrics.length > 0) {
-        const dosing = document.getElementById('dosing').value;
-        
         if (dosing === 'single') {
             const cmaxValues = exposureMetrics.map(m => m.cmax);
+            const tmaxValues = exposureMetrics.map(m => m.tmax);
             const aucValues = exposureMetrics.map(m => m.auc);
+            const clFValues = exposureMetrics.map(m => m.cl_f);
             
-            addMetricRow(metricsTable, 'Cmax (mg/L)', cmaxValues);
-            addMetricRow(metricsTable, 'AUC (mg·h/L)', aucValues);
+            addMetricRow(metricsTable, 'Cmax (ng/mL)', cmaxValues.map(v => v * 1000)); // Convert to ng/mL
+            addMetricRow(metricsTable, 'Tmax (h)', tmaxValues);
+            addMetricRow(metricsTable, 'AUC₀₋∞ (ng·h/mL)', aucValues.map(v => v * 1000));
+            addMetricRow(metricsTable, 'CL/F (L/h)', clFValues);
+            
+            // Add dose-normalized values
+            addMetricRow(metricsTable, 'Cmax/Dose (ng/mL/mg)', cmaxValues.map(v => v * 1000 / dose));
+            addMetricRow(metricsTable, 'AUC/Dose (ng·h/mL/mg)', aucValues.map(v => v * 1000 / dose));
         } else {
             const cmaxValues = exposureMetrics.map(m => m.cmax_ss);
             const cminValues = exposureMetrics.map(m => m.cmin_ss);
+            const tmaxValues = exposureMetrics.map(m => m.tmax_ss);
             const aucValues = exposureMetrics.map(m => m.auc_ss);
+            const cavgValues = exposureMetrics.map(m => m.cavg_ss);
             
-            addMetricRow(metricsTable, 'Cmax,ss (mg/L)', cmaxValues);
-            addMetricRow(metricsTable, 'Cmin,ss (mg/L)', cminValues);
-            addMetricRow(metricsTable, 'AUCtau,ss (mg·h/L)', aucValues);
+            addMetricRow(metricsTable, 'Cmax,ss (ng/mL)', cmaxValues.map(v => v * 1000));
+            addMetricRow(metricsTable, 'Cmin,ss (ng/mL)', cminValues.map(v => v * 1000));
+            addMetricRow(metricsTable, 'Tmax,ss (h)', tmaxValues);
+            addMetricRow(metricsTable, 'Cavg,ss (ng/mL)', cavgValues.map(v => v * 1000));
+            addMetricRow(metricsTable, 'AUCτ,ss (ng·h/mL)', aucValues.map(v => v * 1000));
+            
+            // Add fluctuation
+            const fluctuation = cmaxValues.map((cmax, i) => ((cmax - cminValues[i]) / cavgValues[i] * 100));
+            addMetricRow(metricsTable, 'Fluctuation (%)', fluctuation);
         }
     }
 }
