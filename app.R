@@ -2,7 +2,6 @@ library(shiny)
 library(mrgsolve)
 library(ggplot2)
 library(dplyr)
-library(tidyr)
 
 source("R/pk_models.R")
 source("R/ui_components.R")
@@ -127,7 +126,7 @@ server <- function(input, output, session) {
       labs(x = "Time (hours)", 
            y = "Concentration (mg/L)",
            title = paste("PK Profile -", 
-                         gsub("_", " ", str_to_title(input$model_type)), 
+                         gsub("_", " ", tools::toTitleCase(input$model_type)), 
                          "Model")) +
       theme_minimal() +
       theme(

@@ -2,7 +2,15 @@ simulate_pk <- function(model_type, dose, dose_type, n_doses, tau, params, sim_t
   
   model <- get_pk_model(model_type)
   
-  model <- param(model, .list = params)
+  # Update parameters individually based on model type
+  if (model_type == "one_comp") {
+    model <- param(model, CL = params$CL, V = params$V)
+  } else if (model_type == "two_comp") {
+    model <- param(model, CL = params$CL, V1 = params$V1, V2 = params$V2, Q = params$Q)
+  } else if (model_type == "three_comp") {
+    model <- param(model, CL = params$CL, V1 = params$V1, V2 = params$V2, 
+                   V3 = params$V3, Q2 = params$Q2, Q3 = params$Q3)
+  }
   
   if (dose_type == "single") {
     events <- ev(amt = dose, cmt = 1, time = 0)
@@ -14,7 +22,7 @@ simulate_pk <- function(model_type, dose, dose_type, n_doses, tau, params, sim_t
   out <- model %>%
     ev(events) %>%
     mrgsim(end = sim_time, delta = 0.1) %>%
-    as_tibble()
+    as.data.frame()
   
   param_summary <- create_param_summary(model_type, params)
   exposure_metrics <- calculate_exposure_metrics(out, dose, dose_type, n_doses, tau)
@@ -80,7 +88,8 @@ calculate_exposure_metrics <- function(data, dose, dose_type, n_doses, tau) {
   if (dose_type == "single") {
     cmax <- max(data$CP)
     tmax <- data$time[which.max(data$CP)]
-    auc <- pracma::trapz(data$time, data$CP)
+    # Calculate AUC using trapezoidal rule
+    auc <- sum(diff(data$time) * (data$CP[-1] + data$CP[-length(data$CP)]) / 2)
     
     data.frame(
       Metric = c("Cmax", "Tmax", "AUC(0-inf)"),
@@ -98,7 +107,9 @@ calculate_exposure_metrics <- function(data, dose, dose_type, n_doses, tau) {
     cmax_ss <- max(ss_data$CP)
     cmin_ss <- min(ss_data$CP)
     tmax_ss <- ss_data$time[which.max(ss_data$CP)] - last_dose_time
-    auc_ss <- pracma::trapz(ss_data$time - last_dose_time, ss_data$CP)
+    # Calculate AUC using trapezoidal rule
+    time_adj <- ss_data$time - last_dose_time
+    auc_ss <- sum(diff(time_adj) * (ss_data$CP[-1] + ss_data$CP[-length(ss_data$CP)]) / 2)
     
     data.frame(
       Metric = c("Cmax,ss", "Cmin,ss", "Tmax,ss", "AUCtau,ss", "Accumulation Ratio"),

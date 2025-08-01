@@ -1,4 +1,4 @@
-packages <- c("shiny", "mrgsolve", "ggplot2", "dplyr", "tidyr", "pracma", "stringr")
+packages <- c("shiny", "mrgsolve", "ggplot2", "dplyr")
 
 install_if_missing <- function(pkg) {
   if (!require(pkg, character.only = TRUE)) {
